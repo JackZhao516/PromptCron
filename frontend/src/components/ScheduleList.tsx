@@ -73,6 +73,13 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ schedules, onDelete }) => {
     const type = schedule.schedule?.type || 'Not set';
     const time = schedule.schedule?.time || 'Not set';
     const timezone = schedule.schedule?.timezone || 'UTC';
+    const days = schedule.schedule?.days || [];
+    
+    if (type === 'weekly' && days.length > 0) {
+      const formattedDays = days.map(day => day.charAt(0).toUpperCase() + day.slice(1)).join(', ');
+      return `${type.charAt(0).toUpperCase() + type.slice(1)} on ${formattedDays} at ${time} ${timezone}`;
+    }
+    
     return `${type.charAt(0).toUpperCase() + type.slice(1)} at ${time} ${timezone}`;
   };
 

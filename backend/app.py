@@ -11,6 +11,8 @@ import logging
 # Load environment variables
 load_dotenv()
 init_logging()
+logger = logging.getLogger('promptcron')
+
 app = Flask(__name__)
 
 # Configure CORS
@@ -31,6 +33,8 @@ app.config['TESTING'] = False
 
 # Ensure schedules file exists
 prompts_schedules.ensure_csv_exists()
+logger.info("Loading existing schedules")
+prompts_schedules.load_existing_schedules()
 
 def extract_variables(text: str) -> list[str]:
     """Extract variables from text using {{variable}} pattern"""
@@ -43,10 +47,6 @@ def get_schedules():
     """Get all schedules"""
     try:
         schedules = prompts_schedules.get_all_schedules()
-        # Convert prompt_variables to promptVariables for frontend
-        for schedule in schedules:
-            if 'prompt_variables' in schedule:
-                schedule['promptVariables'] = schedule.pop('prompt_variables')
         return jsonify(schedules)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -69,25 +69,22 @@ def create_schedule():
         title_vars = extract_variables(data['email_title'])
         all_vars = list(set(prompt_vars + title_vars))
 
-        # If variables are found, validate promptVariables
-        if all_vars and (not data.get('promptVariables') or not isinstance(data['promptVariables'], dict)):
-            return jsonify({'error': 'promptVariables must be a non-empty object when using variables'}), 400
+        # If variables are found, validate prompt_variables
+        if all_vars and (not data.get('prompt_variables') or not isinstance(data['prompt_variables'], dict)):
+            return jsonify({'error': 'prompt_variables must be a non-empty object when using variables'}), 400
             
         # Validate all variables have values
         if all_vars:
-            missing_vars = [var for var in all_vars if var not in data['promptVariables'] or not data['promptVariables'][var]]
+            missing_vars = [var for var in all_vars if var not in data['prompt_variables'] or not data['prompt_variables'][var]]
             if missing_vars:
                 return jsonify({'error': f'Missing values for variables: {", ".join(missing_vars)}'}), 400
         else:
-            # No variables found, set empty promptVariables if not provided
-            data['promptVariables'] = {}
+            # No variables found, set empty prompt_variables if not provided
+            data['prompt_variables'] = {}
 
         # Remove duplicate emailTitle if present
         if 'emailTitle' in data:
             del data['emailTitle']
-
-        # Convert promptVariables to prompt_variables for database storage
-        data['prompt_variables'] = data.pop('promptVariables', {})
         
         # Validate schedule fields
         schedule = data['schedule']
@@ -135,10 +132,6 @@ def create_schedule():
                     return jsonify({'error': 'end_date must be after start_date'}), 400
         
         new_schedule = prompts_schedules.add_schedule(data)
-        
-        # Convert back to promptVariables for frontend response
-        if 'prompt_variables' in new_schedule:
-            new_schedule['promptVariables'] = new_schedule.pop('prompt_variables')
             
         return jsonify(new_schedule), 201
     except Exception as e:
@@ -162,7 +155,7 @@ application = app
 if __name__ == '__main__':
     # This block will only be entered if running directly with python app.py
     # In production, use gunicorn instead
-    print("Warning: Running in development mode. Use gunicorn for production.")
+    logger.info("Warning: Running in development mode. Use gunicorn for production.")
     host = os.getenv('HOST', '0.0.0.0')
     port = int(os.getenv('PORT', '8000'))
     app.run(host=host, port=port)

@@ -230,6 +230,9 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ onSubmit }) => {
             Add
           </button>
         </div>
+        <p className="mt-1 text-sm text-gray-500">
+          Remember to click the Add button after entering each email address.
+        </p>
         {emailList.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {emailList.map((email, index) => (
@@ -253,7 +256,7 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ onSubmit }) => {
 
       <div>
         <label className="block text-sm font-medium text-gray-700">
-          {`Email Title (can use {{variable}} from prompt)`}
+          {`Email Title (use {{variable}} for variables)`}
         </label>
         <input
           type="text"
@@ -306,6 +309,9 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ onSubmit }) => {
                   Add
                 </button>
               </div>
+              <p className="mt-1 text-sm text-gray-500">
+                Remember to click the Add button after entering the prompt variable value.
+              </p>
               {formData.prompt_variables[variable]?.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {formData.prompt_variables[variable].map((value, index) => (

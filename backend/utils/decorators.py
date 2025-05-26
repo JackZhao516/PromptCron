@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
-from flask import request, jsonify, Response
+from flask import request, Response
 
 
 def init_logging():
@@ -75,4 +75,4 @@ def log_request_response(func):
         
         return response
         
-    return wrapper 
+    return wrapper

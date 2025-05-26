@@ -3,11 +3,13 @@ import pandas as pd
 import json
 import pytz
 from datetime import datetime
+from itertools import product
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from gateway.email import send_email
-from gateway.llm import get_ai_response
+from gateway.email_api import send_email
+from gateway.llm_api import get_ai_response
 import logging
+import re
 
 # Configure logging
 logger = logging.getLogger('promptcron')
@@ -115,8 +117,9 @@ def schedule_job(schedule_data):
         # Add day of week for weekly schedules
         if schedule_type == 'weekly':
             days = schedule_data['schedule'].get('days', [])
+            standard_days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
             if days:
-                trigger_kwargs['day_of_week'] = ','.join(str(days.index(day)) for day in days)
+                trigger_kwargs['day_of_week'] = ','.join(str(standard_days.index(day)) for day in days)
         
         # Add start and end dates if specified
         if 'start_date' in schedule_data and schedule_data['start_date']:
@@ -136,7 +139,7 @@ def schedule_job(schedule_data):
             replace_existing=True,
             args=[schedule_data]
         )
-        logger.info(f"Successfully scheduled job {job_id}")
+        logger.info(f"Successfully scheduled job {job_id}, {trigger_kwargs}")
     except Exception as e:
         logger.error(f"Error scheduling job {schedule_data['id']}: {str(e)}")
         raise
@@ -159,25 +162,90 @@ def delete_schedule(schedule_id):
     
     return True
 
-async def execute_prompt(schedule_data):
-    """Execute a scheduled prompt"""
+def extract_variables(text: str) -> set[str]:
+    """Extract variables from text using {{variable}} pattern"""
+    matches = re.findall(r'{{([^}]+)}}', text)
+    return set(matches)
+
+def generate_combinations(prompt: str, email_title: str, prompt_variables: dict) -> list[tuple[str, str, dict]]:
+    """Generate all possible combinations of prompt and email title variables
+    Returns:
+        List of tuples (formatted_prompt, formatted_title, used_values_dict)
+    """
+    # Extract variables from both prompt and title
+    prompt_vars = extract_variables(prompt)
+    title_vars = extract_variables(email_title)
+    all_vars = prompt_vars.union(title_vars)
+    
+    # Get all variable names and their possible values
+    # Only include variables that are actually used in either prompt or title
+    var_names = [name for name in prompt_variables.keys() if name in all_vars]
+    var_values = [prompt_variables[name] for name in var_names]
+    
+    # Generate all possible combinations
+    combinations = []
+    for values in product(*var_values):
+        # Create a dictionary of the current combination
+        current_values = dict(zip(var_names, values))
+        
+        # Format both prompt and title with current values
+        formatted_prompt = prompt
+        formatted_title = email_title
+        for var_name, value in current_values.items():
+            if var_name in prompt_vars:
+                formatted_prompt = formatted_prompt.replace(f"{{{{{var_name}}}}}", value)
+            if var_name in title_vars:
+                formatted_title = formatted_title.replace(f"{{{{{var_name}}}}}", value)
+            
+        combinations.append((formatted_prompt, formatted_title, current_values))
+    
+    return combinations
+
+def execute_prompt(schedule_data):
+    """Execute a scheduled prompt for all variable combinations"""
     try:
-        # Replace variables in prompt
-        prompt = schedule_data['prompt']
-        for var_name, values in schedule_data['prompt_variables'].items():
-            if values:
-                prompt = prompt.replace(f"{{{{{var_name}}}}}", values[0])
+        logger.info(f"Executing prompt for schedule {schedule_data['id']}, {schedule_data['prompt']}")
         
-        # Get AI response
-        response = await get_ai_response(prompt)
-        
-        # Send email
-        send_email(
-            schedule_data['emails'],
+        # Generate all prompt and title combinations
+        combinations = generate_combinations(
+            schedule_data['prompt'],
             schedule_data['email_title'],
-            response
+            schedule_data['prompt_variables']
         )
-        logger.info(f"Successfully executed prompt for schedule {schedule_data['id']}")
+        
+        logger.info(f"Generated {len(combinations)} combinations for schedule {schedule_data['id']}")
+        
+        # Process each combination
+        for formatted_prompt, formatted_title, used_values in combinations:
+            try:
+                # Get AI response with citations
+                response_content, citations = get_ai_response(formatted_prompt)
+                
+                # Create email body with prompt, response, and citations in Markdown format
+                email_body = f"""## Prompt Template\n{schedule_data['prompt']}\n\n## Email Title Template\n{schedule_data['email_title']}\n\n## Prompt Variables\n"""
+                # Add used variable values
+                for var_name, value in used_values.items():
+                    email_body += f"- **{var_name}**: {value}\n"
+                
+                email_body += f"\n## Prompt\n{formatted_prompt}\n\n## Response\n{response_content}"
+
+                if citations:
+                    email_body += f"\n{citations}"
+                
+                # Send email with formatted title
+                send_email(
+                    schedule_data['emails'],
+                    formatted_title,
+                    email_body
+                )
+                logger.info(f"Successfully sent email for combination {used_values} of schedule {schedule_data['id']}")
+                
+            except Exception as e:
+                logger.error(f"Error processing combination {used_values} for schedule {schedule_data['id']}: {str(e)}")
+                continue  # Continue with next combination even if one fails
+                
+        logger.info(f"Completed processing all combinations for schedule {schedule_data['id']}")
+        
     except Exception as e:
         logger.error(f"Error executing prompt for schedule {schedule_data['id']}: {str(e)}")
 
@@ -194,6 +262,3 @@ def load_existing_schedules():
         logger.info(f"Successfully loaded and scheduled {len(schedules)} schedules")
     except Exception as e:
         logger.error(f"Error loading schedules from CSV: {str(e)}")
-
-# Load schedules on module import
-load_existing_schedules()
