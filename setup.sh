@@ -15,7 +15,6 @@ deactivate
 if [ ! -f .env ]; then
     cp env_examples/backend.env.example backend/.env
 fi
-cd ..
 
 # Install frontend dependencies and build
 cd frontend
@@ -25,7 +24,6 @@ npm install
 if [ ! -f .env ]; then
     cp env_examples/frontend.env.example frontend/.env
 fi
-cd ..
 
 # Configure nginx
 sudo tee /etc/nginx/sites-available/promptcron <<'EOL'
@@ -67,7 +65,7 @@ EOL
 
 # Create web root directory
 sudo mkdir -p /var/www/promptcron
-sudo chown -R $USER:$USER /var/www/promptcron
+sudo chown -R www-data:www-data /var/www/promptcron
 
 # Enable site and restart nginx
 sudo ln -sf /etc/nginx/sites-available/promptcron /etc/nginx/sites-enabled/

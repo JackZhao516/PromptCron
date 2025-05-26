@@ -114,6 +114,8 @@ The application will be available at:
 
 Run the deployment script:
 ```bash
+HOSTNAME="yourdomain.com / ip"
+echo $HOSTNAME
 chmod +x run.sh
 ./run.sh
 ```

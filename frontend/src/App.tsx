@@ -1,36 +1,62 @@
-import React, { useState } from 'react';
-import { Toaster } from 'react-hot-toast';
+import React, { useState, useEffect } from 'react';
+import { PromptSchedule } from './types';
+import { api } from './services/api';
 import ScheduleForm from './components/ScheduleForm';
 import ScheduleList from './components/ScheduleList';
-import { PromptSchedule } from './types';
+import toast from 'react-hot-toast';
 
 function App() {
   const [schedules, setSchedules] = useState<PromptSchedule[]>([]);
 
-  const addSchedule = (schedule: PromptSchedule) => {
-    setSchedules([...schedules, schedule]);
+  useEffect(() => {
+    loadSchedules();
+  }, []);
+
+  const loadSchedules = async () => {
+    try {
+      const data = await api.getSchedules();
+      setSchedules(data);
+    } catch (error) {
+      toast.error('Failed to load schedules');
+      console.error('Error loading schedules:', error);
+    }
   };
 
-  const deleteSchedule = (id: string) => {
-    setSchedules(schedules.filter(schedule => schedule.id !== id));
+  const handleCreateSchedule = async (schedule: PromptSchedule) => {
+    try {
+      await api.createSchedule(schedule);
+      toast.success('Schedule created successfully');
+      loadSchedules();
+    } catch (error) {
+      toast.error('Failed to create schedule');
+      console.error('Error creating schedule:', error);
+    }
+  };
+
+  const handleDeleteSchedule = async (id: string) => {
+    try {
+      await api.deleteSchedule(id);
+      toast.success('Schedule deleted successfully');
+      setSchedules(schedules.filter(s => s.id !== id));
+    } catch (error) {
+      toast.error('Failed to delete schedule');
+      console.error('Error deleting schedule:', error);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Toaster position="top-right" />
-      <div className="max-w-4xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">PromptCron</h1>
-          <p className="text-lg text-gray-600 mb-8">Schedule AI prompts to be delivered to your email</p>
-        </div>
-        
-        <div className="bg-white shadow rounded-lg p-6 mb-8">
-          <ScheduleForm onSubmit={addSchedule} />
-        </div>
-
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-6">Your Scheduled Prompts</h2>
-          <ScheduleList schedules={schedules} onDelete={deleteSchedule} />
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-3xl mx-auto">
+          <h1 className="text-3xl font-bold text-gray-900 mb-8">PromptCron</h1>
+          <div className="bg-white shadow rounded-lg p-6 mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">Create New Schedule</h2>
+            <ScheduleForm onSubmit={handleCreateSchedule} />
+          </div>
+          <div className="bg-white shadow rounded-lg p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">Your Schedules</h2>
+            <ScheduleList schedules={schedules} onDelete={handleDeleteSchedule} />
+          </div>
         </div>
       </div>
     </div>

@@ -1,15 +1,21 @@
+export type SortOrder = 'asc' | 'desc';
+
+export interface Schedule {
+  type: 'daily' | 'weekly';
+  time: string;
+  timezone: string;
+  days?: string[];
+}
+
 export interface PromptSchedule {
   id: string;
+  email_title: string;
   emails: string[];
   prompt: string;
-  emailTitle: string;
-  promptVariables: { [key: string]: string[] };
-  schedule: {
-    type: 'daily' | 'weekly';
-    time: string; // HH:mm format
-    timezone: string; // e.g., 'America/New_York'
-    days?: string[]; // ['monday', 'wednesday', etc.]
-  };
+  prompt_variables?: Record<string, string[]>;
+  schedule: Schedule;
+  start_date?: string;
+  end_date?: string;
 }
 
 export type ScheduleType = 'daily' | 'weekly';
@@ -17,8 +23,8 @@ export type ScheduleType = 'daily' | 'weekly';
 export interface ScheduleFormData {
   emails: string[];
   prompt: string;
-  emailTitle: string;
-  promptVariables: { [key: string]: string[] };
+  email_title: string;
+  prompt_variables: Record<string, string[]>;
   scheduleType: ScheduleType;
   time: string;
   timezone: string;
@@ -30,5 +36,4 @@ export interface PromptVariable {
   values: string[];
 }
 
-export type SortField = 'emailTitle';
-export type SortOrder = 'asc' | 'desc'; 
+export type SortField = 'email_title'; 
